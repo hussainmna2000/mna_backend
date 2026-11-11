@@ -5,7 +5,9 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
+from app.models.user import User
+from app.utils.security import generate_customer_id, hash_password
 from app.middleware.rate_limit import limiter
 from app.routes import (
     health,
@@ -27,6 +29,32 @@ logger = logging.getLogger(__name__)
 # Initialize tables
 try:
     Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        admin_email = settings.ADMIN_EMAIL.strip().lower()
+        admin = db.query(User).filter(User.email == admin_email).first()
+        if admin is None:
+            admin = User(
+                email=admin_email,
+                full_name=settings.ADMIN_NAME,
+                customer_id=generate_customer_id(),
+                hashed_password=hash_password(settings.ADMIN_PASSWORD),
+                role="superadmin",
+                status="active",
+                is_verified=True,
+            )
+            db.add(admin)
+            db.commit()
+            logger.info("Initial administrator account provisioned from environment settings.")
+        elif admin.role not in ("admin", "superadmin"):
+            admin.role = "superadmin"
+            admin.status = "active"
+            db.commit()
+            logger.info("Configured administrator account promoted to superadmin.")
+        else:
+            logger.info("Configured administrator account is ready.")
+    finally:
+        db.close()
     logger.info("Database initialized.")
 except Exception as e:
     logger.error(f"Database initialization warning: {e}")
