@@ -32,9 +32,9 @@ try:
     db = SessionLocal()
     try:
         admin_email = settings.ADMIN_EMAIL.strip().lower()
-        admin = db.query(User).filter(User.email == admin_email).first()
-        if admin is None:
-            admin = User(
+        admin_user = db.query(User).filter(User.email == admin_email).first()
+        if admin_user is None:
+            admin_user = User(
                 email=admin_email,
                 full_name=settings.ADMIN_NAME,
                 customer_id=generate_customer_id(),
@@ -43,12 +43,12 @@ try:
                 status="active",
                 is_verified=True,
             )
-            db.add(admin)
+            db.add(admin_user)
             db.commit()
             logger.info("Initial administrator account provisioned from environment settings.")
-        elif admin.role not in ("admin", "superadmin"):
-            admin.role = "superadmin"
-            admin.status = "active"
+        elif admin_user.role not in ("admin", "superadmin"):
+            admin_user.role = "superadmin"
+            admin_user.status = "active"
             db.commit()
             logger.info("Configured administrator account promoted to superadmin.")
         else:
